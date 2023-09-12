@@ -137,7 +137,7 @@ class MessageGeneration {
         .toList();
     for (var each in usableTranslations) {
       for (var original in each.originalMessages!) {
-        original.addTranslation(locale, each.message);
+        original.addTranslation(locale, each.message, wrapper);
       }
     }
     usableTranslations.sort(
@@ -537,8 +537,8 @@ bool _hasArguments(MainMessage message) =>
 Future<String> _mapReference(MainMessage original, String locale, EncryptionWrapper wrapper) async {
   if (!_hasArguments(original)) {
     // No parameters, can be printed simply.
-    return 'MessageLookupByLibrary.simpleMessage(_intl_wrappers.u("'
-        '${await wrapper.wrap(original.translations[locale])}"))';
+    return 'MessageLookupByLibrary.simpleMessage('
+        '${original.translations[locale]})';
   } else {
     return _methodNameFor(original.name);
   }

@@ -17,6 +17,7 @@ dependencies:
   petitparser: ">=4.0.0 <8.0.0"
   yaml: ^3.0.0
   cryptography: ^2.5.0
+  encrypt: 5.0.1
 
 dev_dependencies:
   build_runner: ^2.0.6

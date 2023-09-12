@@ -4,10 +4,12 @@ class EncryptionConfig {
 
   final bool enabled;
   final String? key;
+  final bool verbose;
 
   EncryptionConfig({
     required this.enabled,
-    this.key
+    this.key,
+    required this.verbose
   });
 
   static EncryptionConfig? fromConfig(yaml.YamlMap? config) {
@@ -17,7 +19,8 @@ class EncryptionConfig {
 
     return EncryptionConfig(
       enabled: config['enabled'] == true,
-      key: config['key'] is String ? config['key'] : null
+      key: config['key'] is String ? config['key'] : null,
+      verbose: config['verbose'] is bool ? config['verbose'] : false
     );
   }
 }
