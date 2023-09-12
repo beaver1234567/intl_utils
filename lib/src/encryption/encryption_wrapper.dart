@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:intl_utils/src/encryption/encryption_config.dart';
 import 'package:intl_utils/src/encryption/encryption_helper.dart';
+
+import 'package:encrypt/encrypt.dart' as encrypt;
 
 class EncryptionWrapper {
 
@@ -19,6 +23,18 @@ class EncryptionWrapper {
     }
 
     return EncryptionWrapper(null);
+  }
+
+  String wrapValue(String value) {
+    if (encodedIv == null || encodedKey == null) {
+      return value;
+    }
+
+    final key = encrypt.Key.fromBase64(encodedKey!);
+    final iv = encrypt.IV.fromBase64(encodedIv!);
+    final cipher = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc, padding: 'PKCS7'));
+    final result = cipher.encrypt(value, iv: iv);
+    return result.base64;
   }
 
   Future<String?> wrap(String? value) async {

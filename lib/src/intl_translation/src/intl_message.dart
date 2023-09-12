@@ -327,7 +327,7 @@ abstract class Message {
 
   /// Return a string representation of this message for use in generated Dart
   /// code.
-  String toCode();
+  String toCode(EncryptionWrapper? wrapper);
 
   /// Return a JSON-storable representation of this message which can be
   /// interpolated at runtime.
@@ -401,7 +401,7 @@ class CompositeMessage extends Message {
   }
 
   @override
-  String toCode() => pieces.map((each) => each.toCode()).join('');
+  String toCode(EncryptionWrapper? wrapper) => pieces.map((each) => each.toCode(wrapper)).join(' + ');
 
   @override
   List<Object?> toJson() => pieces.map((each) => each.toJson()).toList();
@@ -421,7 +421,7 @@ class LiteralString extends Message {
   LiteralString(this.string, Message? parent) : super(parent);
 
   @override
-  String toCode() => escapeAndValidateString(string);
+  String toCode(EncryptionWrapper? wrapper) => "_intl_wrappers.u(\"${escapeAndValidateString(wrapper?.wrapValue(string) ?? string)}\")";
 
   @override
   String toJson() => string;
@@ -482,7 +482,7 @@ class VariableSubstitution extends Message {
   // surrounding text.
 
   @override
-  String toCode() => '\${$variableName}';
+  String toCode(EncryptionWrapper? wrapper) => "\"\${$variableName}\"";
 
   @override
   int? toJson() => index;
@@ -598,14 +598,14 @@ class MainMessage extends ComplexMessage {
 
   /// Record the translation for this message in the given locale, after
   /// suitably escaping it.
-  void addTranslation(String locale, Message translated) {
+  void addTranslation(String locale, Message translated, EncryptionWrapper? wrapper) {
     translated.parent = this;
-    translations[locale] = translated.toCode();
+    translations[locale] = translated.toCode(wrapper);
     jsonTranslations[locale] = translated.toJson();
   }
 
   @override
-  Never toCode() =>
+  Never toCode(EncryptionWrapper? wrapper) =>
       throw UnsupportedError('MainMessage.toCode requires a locale');
 
   @override
@@ -618,9 +618,9 @@ class MainMessage extends ComplexMessage {
     var out = StringBuffer()
       ..write('static String $name(')
       ..write((arguments ?? []).join(', '))
-      ..write(') => _intl_wrappers.u("')
-      ..write(await wrapper.wrap(translations[locale]))
-      ..write('");');
+      ..write(') => ')
+      ..write(translations[locale])
+      ..write(';');
     return out.toString();
   }
 
@@ -629,10 +629,10 @@ class MainMessage extends ComplexMessage {
     return jsonTranslations[locale];
   }
 
-  String turnInterpolationBackIntoStringForm(Message message, chunk) {
+  String turnInterpolationBackIntoStringForm(Message message, chunk, EncryptionWrapper? wrapper) {
     if (chunk is String) return escapeAndValidateString(chunk);
     if (chunk is int) return '${r'${' + message.arguments[chunk]}}';
-    if (chunk is Message) return chunk.toCode();
+    if (chunk is Message) return chunk.toCode(wrapper);
     throw ArgumentError.value(chunk, 'Unexpected value in Intl.message');
   }
 
@@ -782,7 +782,7 @@ abstract class SubMessage extends ComplexMessage {
   }
 
   @override
-  String toCode() {
+  String toCode(EncryptionWrapper? wrapper) {
     var out = StringBuffer();
     out.write('\${');
     out.write(dartMessageName);
@@ -794,6 +794,7 @@ abstract class SubMessage extends ComplexMessage {
         (StringBuffer buffer, arg) =>
             buffer..write(", $arg: '${this[arg].toCode()}'"));
     out.write(')}');
+    print('sub message ${out.toString()}');
     return out.toString();
   }
 
@@ -1059,7 +1060,7 @@ class Select extends SubMessage {
   /// from Plural/Gender in that it prints a literal map rather than
   /// named arguments.
   @override
-  String toCode() {
+  String toCode(EncryptionWrapper? wrapper) {
     var out = StringBuffer();
     out.write('\${');
     out.write(dartMessageName);
@@ -1070,7 +1071,7 @@ class Select extends SubMessage {
     args.fold(
         out,
         (StringBuffer buffer, arg) =>
-            buffer..write("'$arg': '${this[arg]?.toCode()}', "));
+            buffer..write("'$arg': '${this[arg]?.toCode(wrapper)}', "));
     out.write('})}');
     return out.toString();
   }

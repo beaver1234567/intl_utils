@@ -101,19 +101,23 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:core';
 import 'dart:typed_data';
 
 const String encryptionKey = "$encodedKey";
 const String encryptionIv = "$encodedIv";
 
 String decryptString(String value) {
+  final s = DateTime.now().microsecondsSinceEpoch;
   try {
     final key = encrypt.Key.fromBase64(encryptionKey);
     final iv = encrypt.IV.fromBase64(encryptionIv);
     final bytes = base64.decode(value);
     final cipher = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc, padding: 'PKCS7'));
     final decrypted = cipher.decryptBytes(encrypt.Encrypted(bytes), iv: iv);
-    return utf8.decode(decrypted);
+    final ret = utf8.decode(decrypted);
+    ${config.verbose ? 'print("decryptString time=\${DateTime.now().microsecondsSinceEpoch - s} length=\${value.length} ret=\${ret.length}");' : ''}
+    return ret;
   } catch (e, s) {
     print("decryptString value=\$value failed");
     print("decryptString error \$e");
