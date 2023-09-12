@@ -1,3 +1,4 @@
+import 'package:intl_utils/src/encryption/encryption_config.dart';
 import 'package:yaml/yaml.dart' as yaml;
 
 import '../utils/file_utils.dart';
@@ -11,6 +12,7 @@ class PubspecConfig {
   String? _outputDir;
   bool? _useDeferredLoading;
   LocalizelyConfig? _localizelyConfig;
+  EncryptionConfig? _encryptionConfig;
 
   PubspecConfig() {
     var pubspecFile = getPubspecFile();
@@ -51,6 +53,9 @@ class PubspecConfig {
         : null;
     _localizelyConfig =
         LocalizelyConfig.fromConfig(flutterIntlConfig['localizely']);
+
+    _encryptionConfig =
+        EncryptionConfig.fromConfig(flutterIntlConfig['encryption']);
   }
 
   bool? get enabled => _enabled;
@@ -66,6 +71,8 @@ class PubspecConfig {
   bool? get useDeferredLoading => _useDeferredLoading;
 
   LocalizelyConfig? get localizelyConfig => _localizelyConfig;
+
+  EncryptionConfig? get encryptionConfig => _encryptionConfig;
 }
 
 class LocalizelyConfig {

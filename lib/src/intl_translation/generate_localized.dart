@@ -46,6 +46,7 @@
 library generate_localized;
 
 import 'package:intl/intl.dart';
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as path;
@@ -106,10 +107,10 @@ class MessageGeneration {
 
   /// Generate a file <[generated_file_prefix]>_messages_<[locale]>.dart
   /// for the [translations] in [locale] and put it in [targetDir].
-  void generateIndividualMessageFile(String basicLocale,
-      Iterable<TranslatedMessage> translations, String targetDir) {
+  Future<void> generateIndividualMessageFile(String basicLocale,
+      Iterable<TranslatedMessage> translations, String targetDir, EncryptionWrapper wrapper) async {
     final fileName = '${generatedFilePrefix}messages_$basicLocale.dart';
-    final content = contentForLocale(basicLocale, translations);
+    final content = await contentForLocale(basicLocale, translations, wrapper);
     final formattedContent = formatDartContent(content, fileName);
 
     // To preserve compatibility, we don't use the canonical version of the
@@ -120,8 +121,9 @@ class MessageGeneration {
 
   /// Generate a string that contains the dart code
   /// with the [translations] in [locale].
-  String contentForLocale(
-      String basicLocale, Iterable<TranslatedMessage> translations) {
+  Future<String> contentForLocale(
+      String basicLocale, Iterable<TranslatedMessage> translations, EncryptionWrapper wrapper) async {
+    print("content for locale $basicLocale ${translations.length}");
     clearOutput();
     var locale = MainMessage()
         .escapeAndValidateString(Intl.canonicalizedLocale(basicLocale));
@@ -139,14 +141,14 @@ class MessageGeneration {
     usableTranslations.sort((a, b) => a.originalMessages!.first.name
         .compareTo(b.originalMessages!.first.name));
 
-    writeTranslations(usableTranslations, locale);
+    await writeTranslations(usableTranslations, locale, wrapper);
 
     return '$output';
   }
 
   /// Write out the translated forms.
-  void writeTranslations(
-      Iterable<TranslatedMessage> usableTranslations, String locale) {
+  Future<void> writeTranslations(
+      Iterable<TranslatedMessage> usableTranslations, String locale, EncryptionWrapper wrapper) async {
     for (var translation in usableTranslations) {
       // Some messages we generate as methods in this class. Simpler ones
       // we inline in the map from names to messages.
@@ -156,7 +158,7 @@ class MessageGeneration {
         output
           ..write('  ')
           ..write(
-              original.toCodeForLocale(locale, _methodNameFor(original.name)))
+              await original.toCodeForLocale(locale, _methodNameFor(original.name), wrapper))
           ..write('\n\n');
       }
     }
@@ -164,14 +166,15 @@ class MessageGeneration {
 
     // Now write the map of names to either the direct translation or to a
     // method.
-    var entries = (usableTranslations
-            .expand((translation) => translation.originalMessages!)
-            .toSet()
-            .toList()
-          ..sort((a, b) => a.name.compareTo(b.name)))
-        .map((original) =>
-            '    "${original.escapeAndValidateString(original.name)}" '
-            ': ${_mapReference(original, locale)}');
+    var entries = <String>[];
+    for (final original in (usableTranslations
+        .expand((translation) => translation.originalMessages!)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name)))) {
+      entries.add('    _intl_wrappers.k("${await wrapper.wrap(original.escapeAndValidateString(original.name))}") '
+          ': ${await _mapReference(original, locale, wrapper)}');
+    }
     output
       ..write(entries.join(',\n'))
       ..write('\n  };\n}\n');
@@ -206,6 +209,9 @@ class MessageGeneration {
 
 import 'package:$intlImportPath/intl.dart';
 import 'package:$intlImportPath/message_lookup_by_library.dart';
+import '../wrappers.dart' as _intl_wrappers;
+
+
 $extraImports
 final messages = new MessageLookup();
 
@@ -369,8 +375,8 @@ import '${generatedFilePrefix}messages_all.dart' show evaluateJsonTemplate;
   }
 
   @override
-  void writeTranslations(
-      Iterable<TranslatedMessage> usableTranslations, String locale) {
+  Future<void> writeTranslations(
+      Iterable<TranslatedMessage> usableTranslations, String locale, EncryptionWrapper wrapper) async {
     output.write(r'''
   Map<String, dynamic> _messages;
   Map<String, dynamic> get messages => _messages ??=
@@ -513,11 +519,11 @@ bool _hasArguments(MainMessage message) =>
 ///
 ///  This is helpful for the compiler.
 /// */
-String _mapReference(MainMessage original, String locale) {
+Future<String> _mapReference(MainMessage original, String locale, EncryptionWrapper wrapper) async {
   if (!_hasArguments(original)) {
     // No parameters, can be printed simply.
-    return 'MessageLookupByLibrary.simpleMessage("'
-        '${original.translations[locale]}")';
+    return 'MessageLookupByLibrary.simpleMessage(_intl_wrappers.u("'
+        '${await wrapper.wrap(original.translations[locale])}"))';
   } else {
     return _methodNameFor(original.name);
   }
