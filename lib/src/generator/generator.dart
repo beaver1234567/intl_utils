@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:intl_utils/src/encryption/encryption_config.dart';
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 
 import '../config/pubspec_config.dart';
 import '../constants/constants.dart';
@@ -17,6 +21,7 @@ class Generator {
   late String _outputDir;
   late bool _useDeferredLoading;
   late bool _otaEnabled;
+  late EncryptionConfig? _encryptionConfig;
 
   /// Creates a new generator with configuration from the 'pubspec.yaml' file.
   Generator() {
@@ -67,13 +72,69 @@ class Generator {
 
     _otaEnabled =
         pubspecConfig.localizelyConfig?.otaEnabled ?? defaultOtaEnabled;
+
+    _encryptionConfig = pubspecConfig.encryptionConfig;
   }
 
   /// Generates localization files.
   Future<void> generateAsync() async {
+    var wrapper = await EncryptionWrapper.fromConfig(_encryptionConfig);
+
     await _updateL10nDir();
     await _updateGeneratedDir();
-    await _generateDartFiles();
+    await _generateWrappers(wrapper);
+    await _generateDartFiles(wrapper);
+  }
+
+  Future<void> _generateWrappers(EncryptionWrapper wrapper) async {
+    var fileName = "wrappers.dart";
+    var file = File("$_outputDir/$fileName");
+
+    final config = _encryptionConfig;
+    final encodedKey = wrapper.encodedKey;
+    final encodedIv = wrapper.encodedIv;
+    if (config != null && config.enabled && encodedKey != null && encodedIv != null) {
+      file.writeAsString("""
+// hello world
+
+import 'package:encrypt/encrypt.dart' as encrypt;
+import 'dart:collection';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+const String encryptionKey = "$encodedKey";
+const String encryptionIv = "$encodedIv";
+
+String decryptString(String value) {
+  try {
+    final key = encrypt.Key.fromBase64(encryptionKey);
+    final iv = encrypt.IV.fromBase64(encryptionIv);
+    final bytes = base64.decode(value);
+    final cipher = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc, padding: 'PKCS7'));
+    final decrypted = cipher.decryptBytes(encrypt.Encrypted(bytes), iv: iv);
+    return utf8.decode(decrypted);
+  } catch (e, s) {
+    print("decryptString value=\$value failed");
+    print("decryptString error \$e");
+    print("\$s");
+    rethrow;
+  }
+}
+
+String k(String key) => decryptString(key);
+  
+String u(String value) => decryptString(value);
+    """);
+    } else {
+      file.writeAsString("""
+// hello world
+
+String k(String key) => key;
+  
+String u(String value) => value;
+    """);
+    }
   }
 
   Future<void> _updateL10nDir() async {
@@ -144,12 +205,12 @@ class Generator {
         : locales;
   }
 
-  Future<void> _generateDartFiles() async {
+  Future<void> _generateDartFiles(EncryptionWrapper wrapper) async {
     var outputDir = getIntlDirectoryPath(_outputDir);
     var dartFiles = [getL10nDartFilePath(_outputDir)];
     var arbFiles = getArbFiles(_arbDir).map((file) => file.path).toList();
 
     var helper = IntlTranslationHelper(_useDeferredLoading);
-    helper.generateFromArb(outputDir, dartFiles, arbFiles);
+    await helper.generateFromArb(outputDir, dartFiles, arbFiles, wrapper);
   }
 }

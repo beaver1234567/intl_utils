@@ -10,7 +10,8 @@ Future<void> main(List<String> args) async {
     await generator.generateAsync();
   } on GeneratorException catch (e) {
     exitWithError(e.message);
-  } catch (e) {
+  } catch (e, s) {
+    print(s);
     exitWithError('Failed to generate localization files.\n$e');
   }
 }

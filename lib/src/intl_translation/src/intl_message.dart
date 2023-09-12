@@ -71,6 +71,7 @@ import 'dart:convert';
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/constant_evaluator.dart';
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 
 /// A default function for the [Message.expanded] method.
 dynamic _nullTransform(msg, chunk) => chunk;
@@ -613,13 +614,13 @@ class MainMessage extends ComplexMessage {
 
   /// Generate code for this message, expecting it to be part of a map
   /// keyed by name with values the function that calls Intl.message.
-  String toCodeForLocale(String locale, String name) {
+  Future<String> toCodeForLocale(String locale, String name, EncryptionWrapper wrapper) async {
     var out = StringBuffer()
       ..write('static String $name(')
       ..write((arguments ?? []).join(', '))
-      ..write(') => "')
-      ..write(translations[locale])
-      ..write('";');
+      ..write(') => _intl_wrappers.u("')
+      ..write(await wrapper.wrap(translations[locale]))
+      ..write('");');
     return out.toString();
   }
 
