@@ -31,6 +31,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 import 'package:path/path.dart' as path;
 
 // Due to a delay in the maintenance of the 'intl_translation' package,
@@ -58,11 +59,12 @@ class IntlTranslationHelper {
     generation.generatedFilePrefix = '';
   }
 
-  void generateFromArb(
-    String outputDir,
-    List<String> dartFiles,
-    List<String> arbFiles,
-  ) {
+
+  Future<void> generateFromArb(
+      String outputDir,
+      List<String> dartFiles,
+      List<String> arbFiles,
+      EncryptionWrapper wrapper) async {
     var allMessages = dartFiles.map((file) => extraction.parseFile(File(file)));
     for (var messageMap in allMessages) {
       messageMap.forEach(
@@ -75,9 +77,10 @@ class IntlTranslationHelper {
     for (var arbFile in arbFiles) {
       _loadData(arbFile, messagesByLocale);
     }
-    messagesByLocale.forEach((locale, data) {
-      _generateLocaleFile(locale, data, outputDir);
-    });
+
+    for (final entry in messagesByLocale.entries) {
+      await _generateLocaleFile(entry.key, entry.value, outputDir, wrapper);
+    }
 
     var fileName = '${generation.generatedFilePrefix}messages_all.dart';
     var mainImportFile = File(path.join(outputDir, fileName));
@@ -108,11 +111,9 @@ class IntlTranslationHelper {
     generation.allLocales.add(locale);
   }
 
-  void _generateLocaleFile(
-    String locale,
-    List<Map> localeData,
-    String targetDir,
-  ) {
+
+  Future<void> _generateLocaleFile(
+      String locale, List<Map> localeData, String targetDir, EncryptionWrapper wrapper) async {
     var translations = <TranslatedMessage>[];
     for (var jsonTranslations in localeData) {
       jsonTranslations.forEach((id, messageData) {
@@ -122,7 +123,7 @@ class IntlTranslationHelper {
         }
       });
     }
-    generation.generateIndividualMessageFile(locale, translations, targetDir);
+    await generation.generateIndividualMessageFile(locale, translations, targetDir, wrapper);
   }
 
   /// Regenerate the original IntlMessage objects from the given [data]. For
