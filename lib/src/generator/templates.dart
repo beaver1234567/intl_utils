@@ -1,14 +1,18 @@
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
+
 import '../utils/utils.dart';
 import 'label.dart';
 
 String generateL10nDartFileContent(
-    String className, List<Label> labels, List<String> locales,
+    String className, List<Label> labels, List<String> locales, EncryptionWrapper? wrapper, bool wrapped,
     [bool otaEnabled = false]) {
   return """
 // GENERATED CODE - DO NOT MODIFY BY HAND
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';${otaEnabled ? '\n${_generateLocalizelySdkImport()}' : ''}
 import 'intl/messages_all.dart';
+
+import 'wrappers.dart' as _intl_wrappers;
 
 // **************************************************************************
 // Generator: Flutter Intl IDE plugin
@@ -54,7 +58,7 @@ class $className {
     return Localizations.of<$className>(context, $className);
   }
 ${otaEnabled ? '\n${_generateMetadata(labels)}\n' : ''}
-${labels.map((label) => label.generateDartGetter()).join("\n\n")}
+${labels.map((label) => label.generateDartGetter(wrapper: wrapper, wrapped: wrapped)).join("\n\n")}
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<$className> {
