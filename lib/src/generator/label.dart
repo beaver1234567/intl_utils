@@ -33,6 +33,8 @@
 
 import 'dart:collection';
 
+import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
+
 import '../parser/icu_parser.dart';
 import '../parser/message_format.dart';
 import '../utils/utils.dart';
@@ -285,7 +287,7 @@ class Label {
       {this.type, this.description, this.placeholders});
 
   /// Generates label getter.
-  String generateDartGetter() {
+  String generateDartGetter({bool wrapped = false, EncryptionWrapper? wrapper}) {
     try {
       var content = _escape(this.content);
       var description = _escape(this.description ?? '');
@@ -310,8 +312,8 @@ class Label {
               _generateDartDoc(),
               '  String get $name {',
               '    return Intl.message(',
-              '      \'$content\',',
-              '      name: \'$name\',',
+              wrapped ? '      _intl_wrappers.u(\'${wrapper?.wrapValue(content) ?? content}\'),' : '      \'$content\',',
+              wrapped ? '      name: _intl_wrappers.k(\'${wrapper?.wrapValue(name) ?? name}\'),' : '      name: \'$name\',',
               '      desc: \'$description\',',
               '      args: [],',
               '    );',
@@ -326,8 +328,8 @@ class Label {
               '  String $name(${_generateDartMethodParameters(args)}) {',
               ..._generateFormattingLogic(args),
               '    return Intl.message(',
-              '      \'${_generateCompoundContent(parsedContent, args)}\',',
-              '      name: \'$name\',',
+              '      ${_generateCompoundContent(parsedContent, args, wrapper, wrapped)},',
+              wrapped ? '      name: _intl_wrappers.k(\'${wrapper?.wrapValue(name) ?? name}\'),' : '      name: \'$name\',',
               '      desc: \'$description\',',
               '      args: [${_generateDartMethodArgs(args)}],',
               '    );',
@@ -345,7 +347,7 @@ class Label {
               '    return Intl.plural(',
               '      $pluralArg,',
               _generatePluralOptions(parsedContent[0] as PluralElement, args),
-              '      name: \'$name\',',
+              wrapped ? '      name: _intl_wrappers.k(\'${wrapper?.wrapValue(name) ?? name}\'),' : '      name: \'$name\',',
               '      desc: \'$description\',',
               '      args: [${_generateDartMethodArgs(args)}],',
               '    );',
@@ -363,7 +365,7 @@ class Label {
               '    return Intl.gender(',
               '      $genderArg,',
               _generateGenderOptions(parsedContent[0] as GenderElement, args),
-              '      name: \'$name\',',
+              wrapped ? '      name: _intl_wrappers.k(\'${wrapper?.wrapValue(name) ?? name}\'),' : '      name: \'$name\',',
               '      desc: \'$description\',',
               '      args: [${_generateDartMethodArgs(args)}],',
               '    );',
@@ -383,7 +385,7 @@ class Label {
               '    return Intl.select(',
               '      $choiceArg,',
               _generateSelectOptions(parsedContent[0] as SelectElement, args),
-              '      name: \'$name\',',
+              wrapped ? '      name: _intl_wrappers.k(\'${wrapper?.wrapValue(name) ?? name}\'),' : '      name: \'$name\',',
               '      desc: \'$description\',',
               '      args: [${_generateDartMethodArgs(args)}],',
               '    );',
@@ -735,14 +737,14 @@ class Label {
   bool _isSelect(List<BaseElement> data) =>
       (data.length == 1 && data[0].type == ElementType.select);
 
-  String _generateCompoundContent(List<BaseElement> data, List<Argument> args) {
+  String _generateCompoundContent(List<BaseElement> data, List<Argument> args, EncryptionWrapper? wrapper, bool wrapped) {
     var content = data
         .asMap()
         .map((index, item) {
           switch (item.type) {
             case ElementType.literal:
               {
-                return MapEntry(index, item.value);
+                return MapEntry(index, wrapped ? "_intl_wrappers.u('${wrapper?.wrapValue(item.value) ?? item.value}')" : "'${item.value}'");
               }
             case ElementType.argument:
               {
@@ -750,11 +752,7 @@ class Label {
                     .singleWhere((element) => element.name == item.value)
                     .formattedName;
 
-                return MapEntry(
-                    index,
-                    _isArgumentBracingRequired(data, index)
-                        ? '\${$formattedArg}'
-                        : '\$$formattedArg');
+                return MapEntry(index, '"\${$formattedArg}"');
               }
             case ElementType.plural:
               {
@@ -778,7 +776,7 @@ class Label {
           }
         })
         .values
-        .join();
+        .join(' + ');
 
     return content;
   }

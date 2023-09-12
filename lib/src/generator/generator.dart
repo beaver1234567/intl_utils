@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:cryptography/helpers.dart';
 import 'package:intl_utils/src/encryption/encryption_config.dart';
 import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 
@@ -81,9 +83,10 @@ class Generator {
     var wrapper = await EncryptionWrapper.fromConfig(_encryptionConfig);
 
     await _updateL10nDir();
-    await _updateGeneratedDir();
+    await _updateGeneratedDir(wrapper, false);
     await _generateWrappers(wrapper);
     await _generateDartFiles(wrapper);
+    await _updateGeneratedDir(wrapper, true);
   }
 
   Future<void> _generateWrappers(EncryptionWrapper wrapper) async {
@@ -94,6 +97,14 @@ class Generator {
     final encodedKey = wrapper.encodedKey;
     final encodedIv = wrapper.encodedIv;
     if (config != null && config.enabled && encodedKey != null && encodedIv != null) {
+      // final random = Random()
+      // final keySaltStart = max(1, random.nextInt(100));
+      // final keySaltEnd = max(1, random.nextInt(100));
+      // final ivSaltStart = max(1, random.nextInt(100));
+      // final ivSaltEnd = max(1, random.nextInt(100));
+      // final saltedKey = randomBytes(keySaltStart) + base64Decode(encodedKey) + randomBytes(keySaltEnd);
+      // final saltedIv = randomBytes(ivSaltStart) + base64Decode(encodedIv) + randomBytes(ivSaltEnd);
+      //
       file.writeAsString("""
 // hello world
 
@@ -148,11 +159,11 @@ String u(String value) => value;
     }
   }
 
-  Future<void> _updateGeneratedDir() async {
+  Future<void> _updateGeneratedDir(EncryptionWrapper? wrapper, bool wrapped) async {
     var labels = _getLabelsFromMainArbFile();
     var locales = _orderLocales(getLocales(_arbDir));
     var content =
-        generateL10nDartFileContent(_className, labels, locales, _otaEnabled);
+        generateL10nDartFileContent(_className, labels, locales, wrapper, wrapped, _otaEnabled);
     var formattedContent = formatDartContent(content, 'l10n.dart');
 
     await updateL10nDartFile(formattedContent, _outputDir);
