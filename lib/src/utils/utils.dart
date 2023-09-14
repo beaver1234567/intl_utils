@@ -50,6 +50,7 @@ String formatDartContent(String content, String fileName) {
     return formatter.format(content);
   } catch (e) {
     info('Failed to format \'$fileName\' file.');
+    print(e);
     return content;
   }
 }

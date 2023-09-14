@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:cryptography/helpers.dart';
+import 'package:intl_utils/src/config/asset_encryption_config.dart';
+import 'package:intl_utils/src/config/flutter_config.dart';
 import 'package:intl_utils/src/encryption/encryption_config.dart';
 import 'package:intl_utils/src/encryption/encryption_wrapper.dart';
 
@@ -15,6 +18,61 @@ import 'intl_translation_helper.dart';
 import 'label.dart';
 import 'templates.dart';
 
+class Pair<A, B> {
+  final A first;
+  final B second;
+
+  Pair(this.first, this.second);
+}
+
+class AssetFile {
+  final File file;
+  final String path;
+
+  AssetFile({required this.file, required this.path});
+}
+
+class AssetDir {
+  final String key;
+  final Map<String, AssetDir> subDirs;
+  final Map<String, AssetFile> children;
+
+  AssetDir({required this.key, required this.subDirs, required this.children});
+
+  AssetDir cd(String key) {
+    if (subDirs.containsKey(key)) {
+      return subDirs[key]!;
+    }
+    return subDirs[key] = AssetDir(key: key, subDirs: {}, children: {});
+  }
+
+  void add(String asset, AssetFile f) {
+    children[asset] = f;
+  }
+
+  String sanitizeClassName(String s) {
+    return s;
+  }
+
+  String sanitizeVarName(String s) {
+    return s.replaceAll(".", "_");
+  }
+
+  String generateClass([String? overrideClassName, bool staticSubDirs = false]) {
+    final className = overrideClassName ?? "_${sanitizeClassName(key)}";
+    return """
+    
+    ${subDirs.values.map((e) => e.generateClass()).join('\n\n')}
+
+    class $className {
+      ${!staticSubDirs ? "const $className();" : ''}
+      ${subDirs.keys.map((e) => "${staticSubDirs ? 'static ' : ''}final ${sanitizeVarName(e)} = const _${sanitizeClassName(e)}();").join("\n\n")}
+      ${children.entries.map((entry) => "final ${sanitizeVarName(entry.key)} = '${entry.value.path}';").join('\n\n')}
+    }
+    """;
+  }
+}
+
 /// The generator of localization files.
 class Generator {
   late String _className;
@@ -24,6 +82,8 @@ class Generator {
   late bool _useDeferredLoading;
   late bool _otaEnabled;
   late EncryptionConfig? _encryptionConfig;
+  late FlutterConfig? _flutterConfig;
+  late AssetEncryptionConfig? _assetsEncryptionConfig;
 
   /// Creates a new generator with configuration from the 'pubspec.yaml' file.
   Generator() {
@@ -76,6 +136,8 @@ class Generator {
         pubspecConfig.localizelyConfig?.otaEnabled ?? defaultOtaEnabled;
 
     _encryptionConfig = pubspecConfig.encryptionConfig;
+    _flutterConfig = pubspecConfig.flutterConfig;
+    _assetsEncryptionConfig = pubspecConfig.assetsEncryptionConfig;
   }
 
   /// Generates localization files.
@@ -87,6 +149,70 @@ class Generator {
     await _generateWrappers(wrapper);
     await _generateDartFiles(wrapper);
     await _updateGeneratedDir(wrapper, true);
+    await _generateAssetsFiles(wrapper);
+  }
+
+  Future<void> _generateAssetsFiles(EncryptionWrapper? wrapper) async {
+    final assets = _flutterConfig?.assets ?? [];
+    print('Using assets sources: $assets');
+
+    final files = <File>[];
+
+    for (final assetSource in assets) {
+      final f = File(assetSource);
+      final stat = await f.stat();
+      if (stat.type == FileSystemEntityType.file) {
+        files.add(f);
+      } else if (stat.type == FileSystemEntityType.directory) {
+        final dirFiles = await _traverseAssetsDirectory(f);
+        files.addAll(dirFiles);
+      } else {
+        throw AssertionError("Asset source '$assetSource' of type '${stat.type}' isn't supported!");
+      }
+    }
+
+    final root = AssetDir(key: 'A', subDirs: {}, children: {});
+    for (final file in files) {
+      final parts = file.path.split('/');
+      var node = root;
+      for (var i = 0; i < parts.length; i++) {
+        if (i < parts.length - 1) {
+          node = node.cd(parts[i]);
+        } else {
+          final fileName = file.path.split('/').last;
+          if (_assetsEncryptionConfig?.enabled == true) {
+            final sha1 = Sha1();
+            final obfuscatedName = (await sha1
+                .hash(base64Decode(_assetsEncryptionConfig!.iv!) + utf8.encode(fileName)))
+                .bytes
+                .map((e) => e.toRadixString(16).padLeft(2, '0'))
+                .join();
+            final obfuscatedFileName = "ap_$obfuscatedName";
+            final assetFile = AssetFile(file: file, path: '${file.parent.path}/$obfuscatedFileName');
+            node.add(parts[i], assetFile);
+          } else {
+            final assetFile = AssetFile(file: file, path: '${file.parent.path}/$fileName');
+            node.add(parts[i], assetFile);
+          }
+        }
+      }
+    }
+
+    final assetsDart = File("$_outputDir/assets.dart");
+    if (await assetsDart.exists()) {
+      await assetsDart.delete();
+    }
+    assetsDart.create(recursive: true);
+    assetsDart.writeAsString(formatDartContent(root.generateClass('A', true), "assets.dart"));
+  }
+
+  Future<List<File>> _traverseAssetsDirectory(File dirFile) async {
+    final files = Directory(dirFile.path).list(recursive: true);
+    return await files
+        .asyncMap((event) => event.stat().then((value) => Pair(event, value)))
+        .where((event) => event.second.type == FileSystemEntityType.file)
+        .map((event) => File(event.first.path))
+        .toList();
   }
 
   Future<void> _generateWrappers(EncryptionWrapper wrapper) async {
