@@ -1,3 +1,5 @@
+import 'package:intl_utils/src/config/asset_encryption_config.dart';
+import 'package:intl_utils/src/config/flutter_config.dart';
 import 'package:intl_utils/src/encryption/encryption_config.dart';
 import 'package:yaml/yaml.dart' as yaml;
 
@@ -13,6 +15,8 @@ class PubspecConfig {
   bool? _useDeferredLoading;
   LocalizelyConfig? _localizelyConfig;
   EncryptionConfig? _encryptionConfig;
+  FlutterConfig? _flutterConfig;
+  AssetEncryptionConfig? _assetEncryptionConfig;
 
   PubspecConfig() {
     var pubspecFile = getPubspecFile();
@@ -56,6 +60,10 @@ class PubspecConfig {
 
     _encryptionConfig =
         EncryptionConfig.fromConfig(flutterIntlConfig['encryption']);
+    _flutterConfig =
+        FlutterConfig.fromConfig(pubspecYaml['flutter']);
+    _assetEncryptionConfig =
+        AssetEncryptionConfig.fromConfig(pubspecYaml['assets_encryption']);
   }
 
   bool? get enabled => _enabled;
@@ -73,6 +81,10 @@ class PubspecConfig {
   LocalizelyConfig? get localizelyConfig => _localizelyConfig;
 
   EncryptionConfig? get encryptionConfig => _encryptionConfig;
+
+  FlutterConfig? get flutterConfig => _flutterConfig;
+
+  AssetEncryptionConfig? get assetsEncryptionConfig => _assetEncryptionConfig;
 }
 
 class LocalizelyConfig {

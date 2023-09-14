@@ -26,6 +26,10 @@ class EncryptionWrapper {
   }
 
   String wrapValue(String value) {
+    if (_helper == null) {
+      return value;
+    }
+
     if (encodedIv == null || encodedKey == null) {
       return value;
     }
