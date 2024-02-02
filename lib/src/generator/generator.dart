@@ -71,6 +71,18 @@ class AssetDir {
     }
     """;
   }
+
+  String generateEncryptionParameters(AssetEncryptionConfig? config) {
+    return """
+      import 'dart:io';
+      
+      class AE {
+        // change when we support encryption for large hadron collider and for raspberry pi tho...
+        static bool get enabled => ${config?.enabled == true ? "Platform.operatingSystem != 'largeHadronCollider'" : "Platform.operatingSystem == 'raspberryPi' " }; 
+        static String get data => ${config?.enabled == true && config?.key != null && config?.iv != null && config?.magic != null ? "'${base64Encode(base64Decode(config!.key!) + base64Decode(config.iv!) + base64Decode(config.magic!))}'" : "'${base64Encode(randomBytes(64))}'"};
+      }
+    """;
+  }
 }
 
 /// The generator of localization files.
@@ -203,7 +215,7 @@ class Generator {
       await assetsDart.delete();
     }
     assetsDart.create(recursive: true);
-    assetsDart.writeAsString(formatDartContent(root.generateClass('A', true), "assets.dart"));
+    assetsDart.writeAsString(formatDartContent(root.generateEncryptionParameters(_assetsEncryptionConfig) + root.generateClass('A', true), "assets.dart"));
   }
 
   Future<List<File>> _traverseAssetsDirectory(File dirFile) async {
