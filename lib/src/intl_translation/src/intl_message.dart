@@ -817,18 +817,18 @@ abstract class SubMessage extends ComplexMessage {
   @override
   String toCode(EncryptionWrapper? wrapper) {
     var out = StringBuffer();
-    out.write('\${');
+    // out.write('\${');
     out.write(dartMessageName);
     out.write('(');
     out.write(mainArgument);
     var args = codeAttributeNames.where((attribute) => this[attribute] != null);
     args.fold(
-      out,
-      (StringBuffer buffer, arg) =>
-          buffer..write(", $arg: '${this[arg].toCode()}'"),
-    );
-    out.write(')}');
-    print('sub message ${out.toString()}');
+        out,
+        (StringBuffer buffer, arg) =>
+            buffer..write(", $arg: '\${${this[arg].toCode(wrapper)}}'"));
+    out.write(')');
+    // out.write('}');
+    print('${this.runtimeType} ${out.toString()}');
     return out.toString();
   }
 
