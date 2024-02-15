@@ -33,6 +33,9 @@ class EncryptionWrapper {
     if (encodedIv == null || encodedKey == null) {
       return value;
     }
+    if (value.isEmpty) {
+      return "";
+    }
 
     final key = encrypt.Key.fromBase64(encodedKey!);
     final iv = encrypt.IV.fromBase64(encodedIv!);
