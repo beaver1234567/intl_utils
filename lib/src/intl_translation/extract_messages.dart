@@ -349,10 +349,14 @@ class MessageFindingVisitor extends GeneralizingAstVisitor {
   /// if we successfully extracted a message and should stop looking. Return
   /// false if we didn't, so should continue recursing.
   bool addIntlMessage(MethodInvocation node) {
-    if (!looksLikeIntlMessage(node)) return false;
+    if (!looksLikeIntlMessage(node)) {
+      print("node does not look like intl message: $node");
+      return false;
+    }
     var reason = checkValidity(node) ?? _extractMessage(node);
 
     if (reason != null) {
+      print("reason: $reason for node: $node");
       if (!extraction.suppressWarnings) {
         var err = StringBuffer()
           ..write('Skipping invalid Intl.message invocation\n    <$node>\n')
@@ -372,6 +376,7 @@ class MessageFindingVisitor extends GeneralizingAstVisitor {
   String? _extractMessage(MethodInvocation node) {
     MainMessage? message;
     try {
+      // print("processing node: ${node}");
       if (node.methodName.name == 'message') {
         message = messageFromIntlMessageCall(node);
       } else {
@@ -481,6 +486,8 @@ class MessageFindingVisitor extends GeneralizingAstVisitor {
   /// Find the message pieces from a Dart interpolated string.
   List _extractFromIntlCallWithInterpolation(
       MainMessage message, List<AstNode> arguments) {
+    // print("${message.id} args = ${arguments}");
+
     var interpolation = InterpolationVisitor(message, extraction);
     arguments.first.accept(interpolation);
     if (interpolation.pieces.any((x) => x is Plural || x is Gender) &&
