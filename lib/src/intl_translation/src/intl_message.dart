@@ -511,13 +511,21 @@ class MainMessage extends ComplexMessage {
   /// Optional documentation of the member that wraps the message definition.
   List<String> documentation = [];
 
+  static bool _validateMessageExpression(Expression ex) {
+    if (ex is BinaryExpression) {
+      return _validateMessageExpression(ex.leftOperand) &&
+          _validateMessageExpression(ex.rightOperand);
+    }
+    return ex is StringLiteral;
+  }
+
   /// Verify that this looks like a correct Intl.message invocation.
   @override
   String? checkValidity(MethodInvocation node, List arguments,
       String? outerName, List<FormalParameter> outerArgs,
       {bool nameAndArgsGenerated = false, bool examplesRequired = false}) {
-    if (arguments.first is! StringLiteral) {
-      return 'Intl.message messages must be string literals';
+    if (!_validateMessageExpression(arguments.first)) {
+      return 'Intl.message messages must be string literals or binary operation on string literals';
     }
 
     return super.checkValidity(node, arguments, outerName, outerArgs,
@@ -795,7 +803,7 @@ abstract class SubMessage extends ComplexMessage {
             buffer..write(", $arg: '\${${this[arg].toCode(wrapper)}}'"));
     out.write(')');
     // out.write('}');
-    print('${this.runtimeType} ${out.toString()}');
+    // print('${this.runtimeType} ${out.toString()}');
     return out.toString();
   }
 
