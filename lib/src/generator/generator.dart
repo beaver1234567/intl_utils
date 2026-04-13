@@ -55,7 +55,7 @@ class AssetDir {
   }
 
   String sanitizeVarName(String s) {
-    return s.replaceAll(".", "_");
+    return s.replaceAll(".", "_").replaceAll(' ', '_').replaceAll('-', '_');
   }
 
   String generateClass([String? overrideClassName, bool staticSubDirs = false]) {
